@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -19,14 +20,18 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.Socket;
+import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
 import static android.os.Environment.getExternalStoragePublicDirectory;
 
 public class Camera extends AppCompatActivity {
-    Button TakePicBtn;
+    Button TakePicBtn, AnalyzeBtn;
     ImageView imageview;
     String pathToFile;
 
@@ -51,10 +56,26 @@ public class Camera extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+
         if (resultCode == RESULT_OK){
             if (requestCode == 1){
+                AnalyzeBtn = findViewById(R.id.analyzeBtn);
+                AnalyzeBtn.setVisibility(View.VISIBLE);
+
                 Bitmap bitmap = BitmapFactory.decodeFile(pathToFile );
                 imageview.setImageBitmap(bitmap);
+
+                AnalyzeBtn.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        Intent resultIntent = new Intent(getApplicationContext(), Result.class);
+
+                        send sendimg = new send();
+                        sendimg.execute();
+
+                        startActivity(resultIntent);
+                    }
+                });
             }
         }
     }
@@ -84,5 +105,42 @@ public class Camera extends AppCompatActivity {
             Log.d("myLog", "Excep: "+e.toString());
         }
         return image;
+    }
+
+    //class to communicate with server via a socket
+    class send extends AsyncTask<Void,Void,Void> {
+        //socket variable
+        Socket s;
+
+        @Override
+        protected Void doInBackground(Void...params){
+            try { //TODO : change to get IP address of current machine
+                s = new Socket("10.10.188.13",8000); //connects to my IP address
+                InputStream input = new FileInputStream(pathToFile);
+
+                try {
+                    try {
+                        //Reads bytes all together
+                        int bytesRead;
+                        while ((bytesRead = input.read()) != -1) {
+                            s.getOutputStream().write(bytesRead); //Writes bytes to output stream
+                        }
+                    } finally {
+                        //Flushes and closes socket
+                        s.getOutputStream().flush();
+                        s.close();
+                    }
+                } finally {
+                    input.close();
+                }
+            } catch (UnknownHostException e) {
+                System.out.println("Fail");
+                e.printStackTrace();
+            } catch (IOException e) {
+                System.out.println("Fail");
+                e.printStackTrace();
+            }
+            return null;
+        }
     }
 }
